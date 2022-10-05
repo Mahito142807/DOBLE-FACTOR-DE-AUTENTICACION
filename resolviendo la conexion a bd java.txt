@@ -1,0 +1,23 @@
+**** solucionando el acceso a bd desde java ****
+https://www.youtube.com/watch?v=FR6CmikwIv8&list=PLDGsT4jYboTzqGKvAWeQeDkMcgPESbaKF
+https://flyncer.com/
+https://www.ticnow.cl/
+idnow
+https://play.google.com/store/apps/details?id=de.idnow&hl=es_PE&gl=US
+
+https://jmalarcon.es/
+
+Caused by: sun.security.validator.ValidatorException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification
+
+https://www.youtube.com/campusMVPes
+
+*** protegiendo las aplicaciones con ssl ***
+http://201.234.71.92:8073/BSSCommon/ReportX/ReportXLS/SQLServer/sqljdbc_4.0/esn/help/html/ec91fa8a-ab7e-4c1e-a05a-d7951ddf33b1.htm
+
+
+String connectionUrl = 
+    "jdbc:sqlserver://localhost:1433;" +
+     "databaseName=AdventureWorks;integratedSecurity=true;" +
+     "encrypt=true;trustServerCertificate=true";
+
+spring.datasource.url=jdbc:sqlserver://172.31.2.241:1433; + databaseName=apirest; + encrypt=true; + trustServerCertificate=false;

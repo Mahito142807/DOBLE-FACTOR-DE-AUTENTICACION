@@ -1,0 +1,389 @@
+using System;
+using System.DirectoryServices;
+using System.Web.Services;
+using System.Collections;
+using System.Linq;
+using System.Data.SqlClient;
+using System.Data;
+using System.Collections.Generic;
+using System.Configuration;
+
+namespace wsdlPNPAD
+{
+    /// <summary>
+    /// Descripción breve de PNP_AD
+    /// </summary>
+    [WebService(Namespace = "http://tempuri.org/")]
+    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
+    [System.ComponentModel.ToolboxItem(false)]
+    // Para permitir que se llame a este servicio web desde un script, usando ASP.NET AJAX, quite la marca de comentario de la línea siguiente. 
+    // [System.Web.Script.Services.ScriptService]
+    public class PNP_AD : System.Web.Services.WebService
+    {
+        private string ldapPath = "LDAP://" + ConfigurationManager.AppSettings["ldap.host"] + "/DC=intranetpnp,DC=pnp";
+        // private readonly string ldapName = ConfigurationManager.AppSettings["ldap.username"];
+        // private string ldapPass = ConfigurationManager.AppSettings["ldap.password"];
+
+        string tab;
+        [WebMethod()]
+        public bool ValidateUser(string user, string pass)
+        {
+            DirectoryEntry adsEntry = new DirectoryEntry(ldapPath, user, pass);
+            DirectorySearcher adsSearcher = new DirectorySearcher(adsEntry);
+            adsSearcher.Filter = "sAMAccountName=" + user + ")";
+            bool bSucceded = false;
+            try
+            {
+                SearchResult adsSearchResult;
+                adsSearchResult = adsSearcher.FindOne();
+                bSucceded = true;
+                adsEntry.Close();
+
+
+            }
+            catch (Exception ex)
+            {
+                string strError = ex.Message;
+                adsEntry.Close();
+            }
+            return bSucceded;
+        }
+
+        [WebMethod()]
+        public User RecuperaUsuarioExisteAD(string l_cuenta_usuario, string password)
+        {
+            string mensaje_error = "";
+            string path = Convert.ToString(Convert.ToString("LDAP://172.31.1.7/DC=intranetpnp,DC=pnp"));
+            DirectoryEntry directoryEntry = new DirectoryEntry();
+            directoryEntry.Path = path;
+            directoryEntry.AuthenticationType = AuthenticationTypes.Secure;
+            directoryEntry.Username = l_cuenta_usuario.ToString();
+            directoryEntry.Password = password.ToString();
+            string filter = Convert.ToString("sAMAccountName=") + l_cuenta_usuario;
+            DirectorySearcher directorySearcher = new DirectorySearcher(directoryEntry, filter);
+            directorySearcher.SearchScope = SearchScope.Subtree;
+            User clsDatosUsuario = new User();
+            try
+            {
+                SearchResult searchResult = directorySearcher.FindOne();
+                if (searchResult == null)
+                {
+                    clsDatosUsuario.Usuario = string.Empty;
+                    clsDatosUsuario.Password = string.Empty;
+                    clsDatosUsuario.GradoNombreApellidos = string.Empty;
+                    clsDatosUsuario.CarnetPNP = string.Empty;
+                    clsDatosUsuario.Nombre = string.Empty;
+                    clsDatosUsuario.Apellidos = string.Empty;
+                    clsDatosUsuario.Email = string.Empty;
+                    clsDatosUsuario.Estado = string.Empty;
+                    clsDatosUsuario.Ruta = string.Empty;
+                }
+                else
+                {
+
+                    string Estado = searchResult.Properties["Useraccountcontrol"][0].ToString();
+                    if (Estado == "514" | Estado == "66050")
+                        Estado = "DESHABILITADO";
+                    else
+                        Estado = "HABILITADO";
+                    clsDatosUsuario.Usuario = searchResult.Properties["sAMAccountName"][0].ToString();
+                    clsDatosUsuario.Password = password.ToString();
+                    clsDatosUsuario.GradoNombreApellidos = searchResult.Properties["cn"][0].ToString();
+                    clsDatosUsuario.CarnetPNP = searchResult.Properties["sAMAccountName"][0].ToString();
+                    clsDatosUsuario.Nombre = searchResult.Properties["GivenName"][0].ToString();
+                    clsDatosUsuario.Apellidos = searchResult.Properties["sn"][0].ToString();
+                    if (searchResult.Properties["mail"].Count == 0)
+                        clsDatosUsuario.Email = string.Empty;
+                    else
+                        clsDatosUsuario.Email = searchResult.Properties["mail"][0].ToString();
+                    clsDatosUsuario.Estado = Estado.ToString();
+                    clsDatosUsuario.Ruta = searchResult.Path.ToString();
+
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("ERROR METODO RecuperaUsuarioExisteAD: ");
+            }
+            return clsDatosUsuario;
+        }
+        [WebMethod()]
+        public bool ExisteUsuarioLDAP(string l_cuenta_usuario, string passworde, int idsist)
+        {
+
+            bool  valUnidad= Exist(idsist);
+
+            if (!valUnidad) {
+                auditoria(l_cuenta_usuario, idsist, false, "La unidad no existe");
+                return false;
+            }
+
+
+            //  Exist();
+            string mesaje;
+            string estad;
+            bool result = false;
+          
+
+
+            string path = "LDAP://" + ConfigurationManager.AppSettings["ldap.host"] + "/DC=intranetpnp,DC=pnp";
+
+            DirectoryEntry directoryEntry = new DirectoryEntry();
+            directoryEntry.Path = path;
+            directoryEntry.AuthenticationType = AuthenticationTypes.Secure;
+
+            // LLEVARLO AL WEB CONFIG
+
+            directoryEntry.Username = ConfigurationManager.AppSettings["ldap.username"];
+            directoryEntry.Password = ConfigurationManager.AppSettings["ldap.password"];
+
+
+            string filter = Convert.ToString("sAMAccountName=") + l_cuenta_usuario;
+            DirectorySearcher directorySearcher = new DirectorySearcher(directoryEntry, filter);
+            directorySearcher.SearchScope = SearchScope.Subtree;
+
+            SearchResult searchResult = directorySearcher.FindOne();
+
+
+            // wsdlPNPAD.User efectivo = null;
+
+            bool efectivo = false;
+
+            efectivo = ValidateUser(l_cuenta_usuario, passworde);
+
+            try
+            {
+
+                if (searchResult == null)
+                {
+
+                    result = false;
+                    mesaje = " el usuario no esta registrado:";
+
+
+                }
+                else
+                {
+                    estad = searchResult.Properties["Useraccountcontrol"][0].ToString();
+
+
+                    if (estad == "514" | estad == "66050")
+                    {
+
+                        mesaje = "DESHABILITADO";
+
+
+                    }
+                    else
+
+                    if (efectivo == false)
+                    {
+
+                        result = false;
+                        mesaje = "Error authenticating the wrong password user";
+
+                    }
+
+
+                    else
+                    {
+                        result = true;
+                        mesaje = "User with correct password";
+                    }
+
+
+                }
+
+
+            }
+
+            catch (Exception ex)
+            {
+
+                throw new Exception("Error authenticating the wrong password user. " + ex.Message);
+
+            }
+
+            auditoria(l_cuenta_usuario, idsist, result, mesaje);
+            
+            return result;
+        }
+
+        private bool Exist(int idsist)
+        {
+
+            bool exist = false;
+                       
+            string cn = System.Configuration.ConfigurationManager.ConnectionStrings["WsdPNP"].ConnectionString;
+            SqlConnection conn = null;
+
+            conn = new SqlConnection(cn);
+
+
+            SqlCommand cmd = new SqlCommand("consultasist", conn);
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            conn.Open();
+            cmd.Parameters.Add("@idsist", System.Data.SqlDbType.VarChar).Value = @idsist;
+
+          // POR ESTA OTRA FORMA TMB TRABAJA:   //  cmd.Parameters.AddWithValue("@idsist", idsist);
+
+
+            SqlDataReader reader = cmd.ExecuteReader();
+
+          // POR ESTA OTRA FORMA TMB TRABAJA:  //conn.Open();
+            //string sql = "select * from UserSist WHERE idsist = @idsist";
+            //SqlCommand cmd = new SqlCommand(sql, conn);
+            //cmd.Parameters.AddWithValue("@idsist", idsist);
+            //SqlDataReader reader = cmd.ExecuteReader();
+
+            if (reader.HasRows)
+                {
+                exist=true;
+                conn.Close();
+                 }
+
+                else
+                {
+                conn.Close();
+                return exist;
+                
+                 }
+
+
+            return exist;
+        }
+        
+        [WebMethod()]
+        public bool UsuarioHabilitadoLDAP(string v_cuenta_usuario)
+        {
+
+            string path = "LDAP://" + ConfigurationManager.AppSettings["ldap.host"] + "/DC=intranetpnp,DC=pnp";
+
+            bool flag = false;
+
+            using (DirectoryEntry directoryEntry = new DirectoryEntry(path, "netadmin", "netsql0.", AuthenticationTypes.Secure))
+            {
+                using (DirectorySearcher directorySearcher = new DirectorySearcher(directoryEntry))
+                {
+                    directorySearcher.Filter = (Convert.ToString("(|(samAccountName=") + v_cuenta_usuario) + "))";
+                    directorySearcher.PropertiesToLoad.Add("samAccountName");
+                    directorySearcher.PropertiesToLoad.Add("userAccountControl");
+
+                    using (SearchResultCollection searchResultCollection = directorySearcher.FindAll())
+                    {
+                        foreach (SearchResult searchResult in searchResultCollection)
+                        {
+                            int num = System.Convert.ToInt32(searchResult.Properties["Useraccountcontrol"][0]);
+                            System.Convert.ToString(searchResult.Properties["samAccountName"][0]);
+                            bool flag2 = (num & 2) > 0;
+                            flag = flag2;
+                        }
+                    }
+                }
+            }
+            return !flag;
+        }
+        [WebMethod()]
+        public User RecuperaDatosUsuarioExisteLDAP(string v_cuenta_usuario)
+        {
+
+            string path = "LDAP://" + ConfigurationManager.AppSettings["ldap.host"] + "/DC=intranetpnp,DC=pnp";
+
+            DirectoryEntry directoryEntry = new DirectoryEntry();
+            directoryEntry.Path = path;
+            directoryEntry.AuthenticationType = AuthenticationTypes.Secure;
+
+
+
+            directoryEntry.Username = ConfigurationManager.AppSettings["ldap.username"];
+            directoryEntry.Password = ConfigurationManager.AppSettings["ldap.password"];
+
+
+            string filter = Convert.ToString("sAMAccountName=") + v_cuenta_usuario;
+            DirectorySearcher directorySearcher = new DirectorySearcher(directoryEntry, filter);
+            directorySearcher.SearchScope = SearchScope.Subtree;
+            User clsDatosUsuario = new User();
+            try
+            {
+                SearchResult searchResult = directorySearcher.FindOne();
+                if (searchResult == null)
+                {
+                    clsDatosUsuario.Usuario = string.Empty;
+                    clsDatosUsuario.Password = string.Empty;
+                    clsDatosUsuario.GradoNombreApellidos = string.Empty;
+                    clsDatosUsuario.CarnetPNP = string.Empty;
+                    clsDatosUsuario.Nombre = string.Empty;
+                    clsDatosUsuario.Apellidos = string.Empty;
+                    clsDatosUsuario.Email = string.Empty;
+                    clsDatosUsuario.Estado = string.Empty;
+                    clsDatosUsuario.Ruta = string.Empty;
+                }
+                else
+                {
+                    // Dim Apellidos As String = searchResult.Properties("sn")(0).ToString
+                    string Estado = searchResult.Properties["Useraccountcontrol"][0].ToString();
+                    if (Estado == "514" | Estado == "66050")
+                        Estado = "DESHABILITADO";
+                    else
+                        Estado = "HABILITADO";
+                    clsDatosUsuario.Usuario = searchResult.Properties["sAMAccountName"][0].ToString();
+                    clsDatosUsuario.Password = string.Empty;
+                    clsDatosUsuario.GradoNombreApellidos = searchResult.Properties["cn"][0].ToString();
+                    clsDatosUsuario.CarnetPNP = searchResult.Properties["sAMAccountName"][0].ToString();
+                    clsDatosUsuario.Nombre = searchResult.Properties["GivenName"][0].ToString();
+                    clsDatosUsuario.Apellidos = searchResult.Properties["sn"][0].ToString();
+                    if (searchResult.Properties["mail"].Count == 0)
+                        clsDatosUsuario.Email = string.Empty;
+                    else
+                        clsDatosUsuario.Email = searchResult.Properties["mail"][0].ToString();
+                    clsDatosUsuario.Estado = Estado.ToString();
+                    clsDatosUsuario.Ruta = searchResult.Path.ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("ERROR METODO RecuperaDatosUsuarioExisteLDAP: ");
+            }
+            return clsDatosUsuario;
+        }
+
+
+        private void auditoria(string l_cuenta_usuario, int idsist, bool result, string mesaje)
+
+        {
+
+
+                string cn = System.Configuration.ConfigurationManager.ConnectionStrings["WsdPNP"].ConnectionString;
+                SqlConnection conn = null;
+
+                conn = new SqlConnection(cn);
+                SqlCommand cmd = new SqlCommand("consultauser", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
+
+                conn.Open();
+                cmd.Parameters.Add("@IdSis", System.Data.SqlDbType.VarChar).Value = idsist;
+                cmd.Parameters.Add("@CipUser", System.Data.SqlDbType.VarChar).Value = l_cuenta_usuario;
+                cmd.Parameters.Add("@Result", System.Data.SqlDbType.VarChar).Value = result;
+                cmd.Parameters.Add("@Mesaje", System.Data.SqlDbType.VarChar).Value = mesaje;
+
+                SqlDataReader reader = cmd.ExecuteReader();
+
+                result=false;
+                conn.Close();
+
+
+        }
+            
+
+
+        }
+
+
+
+
+    }
+    
+ 
+
+     

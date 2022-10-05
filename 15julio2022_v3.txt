@@ -1,0 +1,496 @@
+****UBICACION:
+C:\Users\CHIFU2\Desktop\WSDL PNP C#VS\versiones del 07jul22\wsdlPNPAD
+
+
+using System;
+using System.DirectoryServices;
+using System.Web.Services;
+using System.Collections;
+using System.Linq;
+using System.Data.SqlClient;
+using System.Data;
+using System.Collections.Generic;
+using System.Configuration;
+
+namespace wsdlPNPAD
+{
+    /// <summary>
+    /// Descripción breve de PNP_AD
+    /// </summary>
+    [WebService(Namespace = "http://tempuri.org/")]
+    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
+    [System.ComponentModel.ToolboxItem(false)]
+    // Para permitir que se llame a este servicio web desde un script, usando ASP.NET AJAX, quite la marca de comentario de la línea siguiente. 
+    // [System.Web.Script.Services.ScriptService]
+    public class PNP_AD : System.Web.Services.WebService
+    {
+        private string ldapPath = "LDAP://" + ConfigurationManager.AppSettings["ldap.host"] + "/DC=intranetpnp,DC=pnp";
+        // private readonly string ldapName = ConfigurationManager.AppSettings["ldap.username"];
+        // private string ldapPass = ConfigurationManager.AppSettings["ldap.password"];
+
+        string tab;
+        [WebMethod()]
+        public bool ValidateUser(string user, string pass)
+        {
+            DirectoryEntry adsEntry = new DirectoryEntry(ldapPath, user, pass);
+            DirectorySearcher adsSearcher = new DirectorySearcher(adsEntry);
+            adsSearcher.Filter = "sAMAccountName=" + user + ")";
+            bool bSucceded = false;
+            try
+            {
+                SearchResult adsSearchResult;
+                adsSearchResult = adsSearcher.FindOne();
+                bSucceded = true;
+                adsEntry.Close();
+
+
+            }
+            catch (Exception ex)
+            {
+                string strError = ex.Message;
+                adsEntry.Close();
+            }
+            return bSucceded;
+        }
+
+        [WebMethod()]
+        public User RecuperaUsuarioExisteAD(string l_cuenta_usuario, string password)
+        {
+            string mensaje_error = "";
+            string path = Convert.ToString(Convert.ToString("LDAP://172.31.1.7/DC=intranetpnp,DC=pnp"));
+            DirectoryEntry directoryEntry = new DirectoryEntry();
+            directoryEntry.Path = path;
+            directoryEntry.AuthenticationType = AuthenticationTypes.Secure;
+            directoryEntry.Username = l_cuenta_usuario.ToString();
+            directoryEntry.Password = password.ToString();
+            string filter = Convert.ToString("sAMAccountName=") + l_cuenta_usuario;
+            DirectorySearcher directorySearcher = new DirectorySearcher(directoryEntry, filter);
+            directorySearcher.SearchScope = SearchScope.Subtree;
+            User clsDatosUsuario = new User();
+            try
+            {
+                SearchResult searchResult = directorySearcher.FindOne();
+                if (searchResult == null)
+                {
+                    clsDatosUsuario.Usuario = string.Empty;
+                    clsDatosUsuario.Password = string.Empty;
+                    clsDatosUsuario.GradoNombreApellidos = string.Empty;
+                    clsDatosUsuario.CarnetPNP = string.Empty;
+                    clsDatosUsuario.Nombre = string.Empty;
+                    clsDatosUsuario.Apellidos = string.Empty;
+                    clsDatosUsuario.Email = string.Empty;
+                    clsDatosUsuario.Estado = string.Empty;
+                    clsDatosUsuario.Ruta = string.Empty;
+                }
+                else
+                {
+
+                    string Estado = searchResult.Properties["Useraccountcontrol"][0].ToString();
+                    if (Estado == "514" | Estado == "66050")
+                        Estado = "DESHABILITADO";
+                    else
+                        Estado = "HABILITADO";
+                    clsDatosUsuario.Usuario = searchResult.Properties["sAMAccountName"][0].ToString();
+                    clsDatosUsuario.Password = password.ToString();
+                    clsDatosUsuario.GradoNombreApellidos = searchResult.Properties["cn"][0].ToString();
+                    clsDatosUsuario.CarnetPNP = searchResult.Properties["sAMAccountName"][0].ToString();
+                    clsDatosUsuario.Nombre = searchResult.Properties["GivenName"][0].ToString();
+                    clsDatosUsuario.Apellidos = searchResult.Properties["sn"][0].ToString();
+                    if (searchResult.Properties["mail"].Count == 0)
+                        clsDatosUsuario.Email = string.Empty;
+                    else
+                        clsDatosUsuario.Email = searchResult.Properties["mail"][0].ToString();
+                    clsDatosUsuario.Estado = Estado.ToString();
+                    clsDatosUsuario.Ruta = searchResult.Path.ToString();
+
+                }
+                }
+            catch (Exception ex)
+            {
+                throw new Exception("ERROR METODO RecuperaUsuarioExisteAD: " );
+            }
+            return clsDatosUsuario;
+        }
+        [WebMethod()]
+        public bool ExisteUsuarioLDAP(string l_cuenta_usuario, string passworde, string idsist)
+        {
+
+            string mesaje;
+            string estad;
+
+            
+            string a = l_cuenta_usuario;
+            bool result = false;
+
+
+
+            string path = "LDAP://" + ConfigurationManager.AppSettings["ldap.host"] + "/DC=intranetpnp,DC=pnp";
+
+            DirectoryEntry directoryEntry = new DirectoryEntry();
+            directoryEntry.Path = path;
+            directoryEntry.AuthenticationType = AuthenticationTypes.Secure;
+
+            // LLEVARLO AL WEB CONFIG
+
+            directoryEntry.Username = ConfigurationManager.AppSettings["ldap.username"];
+            directoryEntry.Password = ConfigurationManager.AppSettings["ldap.password"];
+
+           
+            string filter = Convert.ToString("sAMAccountName=") + l_cuenta_usuario;
+            DirectorySearcher directorySearcher = new DirectorySearcher(directoryEntry, filter);
+            directorySearcher.SearchScope = SearchScope.Subtree;
+
+            SearchResult searchResult = directorySearcher.FindOne();
+
+            //
+                      
+           // wsdlPNPAD.User efectivo = null;
+
+            bool efectivo=false;
+                       
+            efectivo = ValidateUser(l_cuenta_usuario, passworde);
+
+            try
+            {
+
+                if (searchResult == null)
+                {
+
+                    result = false;
+                    mesaje = " el usuario no esta registrado:";
+
+
+                }
+                else
+                {
+                    estad = searchResult.Properties["Useraccountcontrol"][0].ToString();
+
+                   
+                    if (estad == "514" | estad == "66050")
+                    {
+
+                        mesaje = "DESHABILITADO";
+
+                   
+                    }
+                    else 
+
+                    if (efectivo == false){
+
+                        result = false;
+                        mesaje = "Error authenticating the wrong password user";
+
+                    }
+
+                    
+                    else {
+                        result = true;
+                        mesaje = "User with correct password";
+                    }
+
+
+                }
+
+
+                }
+
+            catch (Exception ex)
+            {
+
+                throw new Exception("Error authenticating the wrong password user. " + ex.Message);
+
+    }
+
+            auditoria(l_cuenta_usuario, idsist, result, mesaje);
+            return result;
+        }
+
+
+        [WebMethod()]
+        public bool UsuarioHabilitadoLDAP(string v_cuenta_usuario)
+        {
+            
+            string path = "LDAP://" + ConfigurationManager.AppSettings["ldap.host"] + "/DC=intranetpnp,DC=pnp";
+
+            bool flag = false;
+
+            using (DirectoryEntry directoryEntry = new DirectoryEntry(path, "netadmin", "netsql0.", AuthenticationTypes.Secure))
+            {
+                using (DirectorySearcher directorySearcher = new DirectorySearcher(directoryEntry))
+                {
+                    directorySearcher.Filter = (Convert.ToString("(|(samAccountName=") + v_cuenta_usuario) + "))";
+                    directorySearcher.PropertiesToLoad.Add("samAccountName");
+                    directorySearcher.PropertiesToLoad.Add("userAccountControl");
+
+                    using (SearchResultCollection searchResultCollection = directorySearcher.FindAll())
+                    {
+                        foreach (SearchResult searchResult in searchResultCollection)
+                        {
+                            int num = System.Convert.ToInt32(searchResult.Properties["Useraccountcontrol"][0]);
+                            System.Convert.ToString(searchResult.Properties["samAccountName"][0]);
+                            bool flag2 = (num & 2) > 0;
+                            flag = flag2;
+                        }
+                    }
+                }
+            }
+            return !flag;
+        }
+        [WebMethod()]
+        public User RecuperaDatosUsuarioExisteLDAP(string v_cuenta_usuario)
+        {
+            
+            string path = "LDAP://" + ConfigurationManager.AppSettings["ldap.host"] + "/DC=intranetpnp,DC=pnp";
+
+            DirectoryEntry directoryEntry = new DirectoryEntry();
+            directoryEntry.Path = path;
+            directoryEntry.AuthenticationType = AuthenticationTypes.Secure;
+
+            // directoryEntry.Username = "netadmin";
+            //directoryEntry.Username = "ldapName";
+            //directoryEntry.Password = "netsql0.";
+            //directoryEntry.Password = "ldapPass";
+
+            directoryEntry.Username = ConfigurationManager.AppSettings["ldap.username"];
+            directoryEntry.Password = ConfigurationManager.AppSettings["ldap.password"];
+
+
+            string filter = Convert.ToString("sAMAccountName=") + v_cuenta_usuario;
+            DirectorySearcher directorySearcher = new DirectorySearcher(directoryEntry, filter);
+            directorySearcher.SearchScope = SearchScope.Subtree;
+            User clsDatosUsuario = new User();
+            try
+            {
+                SearchResult searchResult = directorySearcher.FindOne();
+                if (searchResult == null)
+                {
+                    clsDatosUsuario.Usuario = string.Empty;
+                    clsDatosUsuario.Password = string.Empty;
+                    clsDatosUsuario.GradoNombreApellidos = string.Empty;
+                    clsDatosUsuario.CarnetPNP = string.Empty;
+                    clsDatosUsuario.Nombre = string.Empty;
+                    clsDatosUsuario.Apellidos = string.Empty;
+                    clsDatosUsuario.Email = string.Empty;
+                    clsDatosUsuario.Estado = string.Empty;
+                    clsDatosUsuario.Ruta = string.Empty;
+                }
+                else
+                {
+                    // Dim Apellidos As String = searchResult.Properties("sn")(0).ToString
+                    string Estado = searchResult.Properties["Useraccountcontrol"][0].ToString();
+                    if (Estado == "514" | Estado == "66050")
+                        Estado = "DESHABILITADO";
+                    else
+                        Estado = "HABILITADO";
+                    clsDatosUsuario.Usuario = searchResult.Properties["sAMAccountName"][0].ToString();
+                    clsDatosUsuario.Password = string.Empty;
+                    clsDatosUsuario.GradoNombreApellidos = searchResult.Properties["cn"][0].ToString();
+                    clsDatosUsuario.CarnetPNP = searchResult.Properties["sAMAccountName"][0].ToString();
+                    clsDatosUsuario.Nombre = searchResult.Properties["GivenName"][0].ToString();
+                    clsDatosUsuario.Apellidos = searchResult.Properties["sn"][0].ToString();
+                    if (searchResult.Properties["mail"].Count == 0)
+                        clsDatosUsuario.Email = string.Empty;
+                    else
+                        clsDatosUsuario.Email = searchResult.Properties["mail"][0].ToString();
+                    clsDatosUsuario.Estado = Estado.ToString();
+                    clsDatosUsuario.Ruta = searchResult.Path.ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("ERROR METODO RecuperaDatosUsuarioExisteLDAP: ");
+            }
+            return clsDatosUsuario;
+        }
+
+
+        private void auditoria(string l_cuenta_usuario, string idsist, bool result, string mesaje)
+
+        {
+
+            string cn = System.Configuration.ConfigurationManager.ConnectionStrings["WsdPNP"].ConnectionString;
+            SqlConnection conn = null;
+
+            conn = new SqlConnection(cn);
+            SqlCommand cmd = new SqlCommand("consultauser2", conn);
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            conn.Open();
+            cmd.Parameters.Add("@IdSis", System.Data.SqlDbType.VarChar).Value = idsist;
+            cmd.Parameters.Add("@CipUser", System.Data.SqlDbType.VarChar).Value = l_cuenta_usuario;
+            cmd.Parameters.Add("@Result", System.Data.SqlDbType.VarChar).Value = result;
+            cmd.Parameters.Add("@Mesaje", System.Data.SqlDbType.VarChar).Value = mesaje;
+
+
+            // cmd.Parameters.Add("@CipUser", System.Data.SqlDbType.VarChar).Value = pasword;
+            SqlDataReader reader = cmd.ExecuteReader();
+
+
+        }
+
+
+
+
+
+    }
+}
+
+************* WEB CONFIG ******************
+
+
+
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Para obtener más información sobre cómo configurar la aplicación ASP.NET, visite
+  https://go.microsoft.com/fwlink/?LinkId=169433
+  -->
+<configuration>
+  <system.web>
+    <compilation debug="true" targetFramework="4.7.2" />
+    <httpRuntime targetFramework="4.7.2" />
+  </system.web>
+  <system.codedom>
+    <compilers>
+      <compiler language="c#;cs;csharp" extension=".cs" type="Microsoft.CodeDom.Providers.DotNetCompilerPlatform.CSharpCodeProvider, Microsoft.CodeDom.Providers.DotNetCompilerPlatform, Version=2.0.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35" warningLevel="4" compilerOptions="/langversion:default /nowarn:1659;1699;1701" />
+      <compiler language="vb;vbs;visualbasic;vbscript" extension=".vb" type="Microsoft.CodeDom.Providers.DotNetCompilerPlatform.VBCodeProvider, Microsoft.CodeDom.Providers.DotNetCompilerPlatform, Version=2.0.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35" warningLevel="4" compilerOptions="/langversion:default /nowarn:41008 /define:_MYTYPE=\&quot;Web\&quot; /optionInfer+" />
+    </compilers>  
+  </system.codedom>
+	<connectionStrings>
+			<add name="WsdPNP" connectionString="Data Source=172.31.2.241;Database=WsdPNP;User ID = sa; Pwd=mao; Connection TimeOut = 9900"/>
+	</connectionStrings>
+<appSettings>
+	<add key="ldap.host" value="172.31.1.7"/>
+	<add key="ldap.username" value="netadmin"/>
+	<add key="ldap.password" value="netsql0."/>    
+</appSettings>
+</configuration>
+
+
+*********** UserPnp
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+
+namespace wsdlPNPAD
+{
+    public class User
+    {
+        private string x_usuario;
+        private string x_password;
+        private string x_gradonombre;
+        private string x_carnetpnp;
+        private string x_nombre;
+        private string x_email;
+        private string x_apellidos;
+        private string x_estado;
+        private string x_ruta;
+        public string Usuario
+        {
+            get
+            {
+                return x_usuario;
+            }
+            set
+            {
+                x_usuario = value;
+            }
+        }
+        public string Password
+        {
+            get
+            {
+                return x_password;
+            }
+            set
+            {
+                x_password = value;
+            }
+        }
+        public string GradoNombreApellidos
+        {
+            get
+            {
+                return x_gradonombre;
+            }
+            set
+            {
+                x_gradonombre = value;
+            }
+        }
+        public string CarnetPNP
+        {
+            get
+            {
+                return x_carnetpnp;
+            }
+            set
+            {
+                x_carnetpnp = value;
+            }
+        }
+        public string Nombre
+        {
+            get
+            {
+                return x_nombre;
+            }
+            set
+            {
+                x_nombre = value;
+            }
+        }
+        public string Email
+        {
+            get
+            {
+                return x_email;
+            }
+            set
+            {
+                x_email = value;
+            }
+        }
+        public string Apellidos
+        {
+            get
+            {
+                return x_apellidos;
+            }
+            set
+            {
+                x_apellidos = value;
+            }
+        }
+        public string Estado
+        {
+            get
+            {
+                return x_estado;
+            }
+            set
+            {
+                x_estado = value;
+            }
+        }
+        public string Ruta
+        {
+            get
+            {
+                return x_ruta;
+            }
+            set
+            {
+                x_ruta = value;
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+https://silo.tips/download/no-title-3474
